@@ -1,0 +1,469 @@
+---
+title: Relación entre intensidad de sentimientos en twitter y número de casos confirmados"
+author: "arlingva"
+date: "12/11/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+rm(list=ls())
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, message = FALSE}
+library(twitteR)
+library(tidyverse)
+library(tidytext)
+library(lubridate)
+library(magrittr)
+library(xts)
+library(dygraphs)
+library(reshape2)
+library(TTR)
+library(imputeTS)
+library(readxl)
+library(janitor)
+library(SnowballC)
+library(tm)
+library(syuzhet)
+library(kableExtra)
+library(plotly)
+library(wordcloud)
+library(RColorBrewer)
+```
+
+Se cargan las funciones.
+
+```{r, message = FALSE}
+source("funciones/GetData.R")
+source("funciones/codigosCOVID.R")
+source("funciones/CleanAndSelect.R")
+source("funciones/customWC.R")
+```
+
+Se crean las carpetas data y tablas para guardar los datos crudos y tidy, repectivamente.
+
+```{r, message = FALSE}
+if(!file.exists("data")){
+  dir.create(("data"))
+}
+
+if(!file.exists("tidyTablas")){
+  dir.create(("tidyTablas"))
+}
+```
+
+# Obteniendo datos de twitter
+
+### Descarga de Léxico Afinn
+
+Para este análisis de sentimientos se utilizó una traducción del léxico Afinn; éste, es un conjunto de palabras con puntuación entre -4 y -1 si son percibidas de forma negativa y entre 1 y 4 si se perciben positivamente. El léxico se descargó [aquí]
+(https://raw.githubusercontent.com/jboscomendoza/rpubs/master/sentimientos_afinn/lexico_afinn.en.es.csv); aunque tiene sus limitaciones, cumple con uno de los propósitos de éste proyecto.
+
+```{r, eval=FALSE}
+# Descarga el archivo
+download.file("https://raw.githubusercontent.com/jboscomendoza/rpubs/master/sentimientos_afinn/lexico_afinn.en.es.csv", "data/lexico_afinn.en.es.csv")
+```
+
+Se lee el léxico afinn y se agrega la palabra COVID con puntuación negativa (-4).
+
+```{r, message = FALSE}
+afinn <- read.csv("data/lexico_afinn.en.es.csv", 
+                  stringsAsFactors = F, 
+                  fileEncoding = "latin1") %>%
+  as_tibble()
+# Se agrega COVID al conjunto afinn
+palabras.covid <- data.frame("covid", -4, "covid")
+colnames(palabras.covid) <- c("Palabra", "Puntuacion", "Word")
+afinn <- rbind(afinn, palabras.covid)
+```
+
+### Conexión a twitter y descarga de datos
+
+Las claves: *consumer_key* (CK), *consumer_secret* (CS), *access_token* (AT) y *access_secret* (AS) se obtienen en https://apps.twitter.com/app.
+
+```{r, message = FALSE}
+#https://apps.twitter.com/app/9399375/keys
+
+CK <- ""
+CS<- ""
+AT<- ""
+AS<- ""
+
+setup_twitter_oauth(CK, CS, AT, AS)
+```
+
+### Selección de cuentas
+
+Se crea un vector con los usuarios que se analizarán y la cantidad de tweets a descargar.
+
+```{r, message = FALSE}
+usuarios <-c("ClaudiaPavlovic", "lopezobrador_", "CelidaLopezc", 
+             "HLGatell", "Enrique_Clausen")
+num.tweets <- 1000
+```
+
+### Limpieza de datos
+
+Con la función GetData se obtienen los últimos estados publicados en twitter para la lista de usuarios.
+
+```{r, eval = F}
+# Descarga de datos
+df.tweet <- GetData(usuarios, num.tweets)
+# Guarda un archivo csv
+write.csv(df.tweet, "data/df.tweet.csv")
+```
+
+Se limpian los datos con la función CleanAndSelect.
+
+```{r, message=FALSE}
+usuarios <- c("ClaudiaPavlovic", "lopezobrador_", "CelidaLopezc")
+# Se leen los datos descargados
+df.tweet <- read.csv("data/df.tweet.csv")
+# limpieza de datos
+df.tweet <- CleanAndSelect(df.tweet, vecUser = usuarios)
+```
+
+Limpieza y tokenización de los datos.
+
+```{r, message = FALSE}
+df.palabras <- df.tweet %>%
+  # tokenización
+  unnest_tokens(input = "text", output = "Palabra")%>%
+  right_join(afinn, ., by = "Palabra") %>%
+  # Las palabras se clasifican en positiva y negativa
+  mutate(Tipo = ifelse(Puntuacion > 0, "Positiva", "Negativa"))
+```
+
+### Cálculo de puntos por tweet
+
+Para descartar algunas palabras en plural, si la última letra de la palabra es **s**, se elimina; además, se reemplaza la palabra **enfermedades** por **enfermedad**.
+
+```{r, message = FALSE}
+df.palabras$Palabra <- df.palabras$Palabra %>%
+  str_replace_all("s$", "") %>%
+  str_replace_all("enfermedades", "enfermedad")
+```
+
+Se crea un data frame donde se suman los puntos de cada palabra, de cada tweet.
+
+```{r, message=FALSE}
+df.tweet <- df.palabras %>%
+  group_by(id, Fecha, screenName) %>%
+  summarise(Puntuacion.tweet = sum(Puntuacion, na.rm = TRUE)) %>%
+  group_by(id) %>%
+  left_join(df.tweet, ., by = "id") %>%
+  select(id2 = id, Puntuacion.tweet) %>%
+  cbind(df.tweet)
+```
+
+### Top 10 de palabras
+
+Se cuenta la frecuencia de cada palabra y se descartan *sí* y *no*.
+
+```{r, message = FALSE}
+# Palabras únicas
+df.palabras %>% 
+  group_by(screenName) %>% 
+  distinct(Palabra) %>% 
+  count() %>% 
+  kbl() %>% 
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive")) 
+
+# se descartan las palabras sí y no
+df.palabras <-
+  df.palabras %>%
+  filter(Palabra != "no") %>%
+  filter(Palabra != "sí")
+write.csv(df.palabras, "tidyTablas/df.palabras.csv")
+```
+
+Se grafica el top 10 de palabras.
+
+```{r, message = FALSE}
+map(c("Positiva", "Negativa"), function(sentimiento) {
+  df.palabras %>%
+    filter(Tipo ==  sentimiento) %>%
+    group_by(screenName) %>%
+    count(Palabra, sort = T) %>%
+    arrange(-n, screenName) %>%
+    top_n(n = 10, wt = n) %>%
+    ggplot() +
+    aes(Palabra, n, fill = screenName) +
+    geom_col()+ 
+    facet_wrap("screenName", scales = "free") +
+    scale_y_continuous(expand = c(0, 0)) +
+    coord_flip() +
+    labs(title = sentimiento) +
+    theme_minimal() +
+    theme(panel.grid.minor = element_blank(),
+        strip.background = element_rect(fill = "gray", colour = NA),
+        legend.position = "none"
+        )
+})
+```
+
+### Nube de palabras
+
+Se muestran las 100 palabras más comunes por usuario.
+
+Andrés Manuel López Obrador
+
+```{r}
+customWC("lopezobrador_", df.palabras)
+```
+
+Claudia Pavlovich Arellano
+
+```{r}
+customWC("ClaudiaPavlovic", df.palabras)
+```
+
+Célida López Cárdenas
+
+```{r}
+customWC("CelidaLopezc", df.palabras)
+```
+
+### Cálculo de puntos por palabra
+
+```{r, message = FALSE}
+df.tweet.date <- df.tweet %>%
+  group_by(screenName, Fecha) %>%
+  summarise(Media = mean(Puntuacion.tweet)) %>%
+  dcast(Fecha ~ screenName)
+write.csv(df.tweet.date, "tidyTablas/df.tweet.date.csv")
+
+xts.tweet.date <- xts(df.tweet.date %>% 
+                       select(-Fecha), 
+                     order.by = df.tweet.date$Fecha)
+
+dygraph(xts.tweet.date) %>%
+  dyOptions(fillGraph=TRUE, pointShape = "ex") %>%
+  dyRangeSelector()
+```
+
+### Interpolando datos
+
+```{r, message = FALSE}
+df.interpolado <- df.tweet.date %>%
+  transmute(AMLO = na_interpolation(lopezobrador_),
+         CPA = na_interpolation(ClaudiaPavlovic),
+         CLC = na_interpolation(CelidaLopezc)) %>%
+  cbind(Fecha = df.tweet.date$Fecha)
+
+xts.interpolado <- xts(df.interpolado %>% 
+                       select(-Fecha), 
+                     order.by = df.interpolado$Fecha)
+
+dygraph(xts.interpolado) %>%
+  dyOptions(fillGraph = TRUE, pointShape = "ex") %>%
+  dyRangeSelector()
+```
+
+### Suavizamiento por promedios móviles
+
+```{r, message = FALSE}
+nSMA <- 10
+
+df.SMA <- df.interpolado %>%
+  transmute(AMLO.SMA = SMA(AMLO, n = nSMA),
+            CPA.SMA = SMA(CPA, n = nSMA),
+            CLC.SMA = SMA(CLC, n = nSMA)) %>%
+  cbind(Fecha = df.tweet.date$Fecha)
+
+df.SMA %>%
+  filter(Fecha >1) -> fecha.min
+fecha.min <- fecha.min$Fecha
+
+df.SMA <- df.SMA %>%
+  filter(Fecha >= fecha.min)
+
+xts.SMA <- xts(df.SMA %>% 
+                 select(-Fecha),
+               order.by = df.SMA$Fecha)
+
+dygraph(xts.SMA) %>%
+  dyOptions(fillGraph = TRUE, pointShape = "ex") %>%
+  dyRangeSelector()
+```
+
+# Obteniendo datos de COVID
+
+Los datos de COVID-19 se tomaron de [datos abiertos] (https://datos.gob.mx/).
+
+### Lectura de datos COVID
+
+Se descarga el archivo
+
+```{r, eval = FALSE}
+# liga del archivo de covid
+filename <- "http://datosabiertos.salud.gob.mx/gobmx/salud/datos_abiertos/datos_abiertos_covid19.zip"
+
+# Descarga el archivo
+download.file(filename, "data/datos_abiertos_covid.zip")
+```
+
+La lectura se puede llevar a cabo de dos formas:
+
+1. Descomprimir y leer
+
+```{r, eval = FALSE}
+# Descomprime el archivo
+df.covid0 <- unzip("data/datos_abiertos_covid.zip", exdir = "data") %>%
+  read.csv() %>%
+  clean_names()
+```
+
+2. Leer desde carpeta data
+201214COVID19MEXICO
+```{r, message = FALSE}
+df.covid0 <- read.csv("data/201214COVID19MEXICO.csv") %>%
+  clean_names()
+```
+
+```{r}
+df.covid0 <- df.covid0 %>%
+  filter(clasificacion_final==3)
+df.covid0 %>% write.csv("data/201214COVID19MEXICO.csv")
+```
+
+
+Se descarga catálogo de conceptos.
+
+```{r, message = FALSE}
+cve_mpo <-read_excel("data/201128 Catalogos.xlsx", sheet = "Catálogo MUNICIPIOS") %>% 
+  clean_names() %>% 
+  mutate(cve_mpo = str_c(as.integer(clave_entidad),
+                         "-",
+                         as.integer(clave_municipio)
+                         )
+         )
+```
+
+Se seleccionan las variables de interés de los casos confirmados.
+
+```{r, message = FALSE}
+df.covid <- df.covid0 %>%
+  # Se seleccionan las variables de interés
+  select(id_registro, fecha_ingreso, 
+         entidad_res, municipio_res, clasificacion_final) %>%
+  # Se seleccionan los casos confirmados
+  filter(clasificacion_final <= 3) %>%
+  # Se cambian valores numéricos por su descriptor
+  codigosCOVID() 
+
+# Formato fecha
+df.covid$fecha_ingreso %<>% ymd()
+  
+df.covid <- df.covid %>%
+  # Se crea variable auxiliar para contar confirmados en Sonora
+  mutate(conf.sonora = ifelse(entidad_res == 26, 1, 0),
+         conf.hmo = ifelse(municipio == "Hermosillo" & entidad_res == 26, 1, 0))
+```
+
+Se crea un _data frame_ con los casos confirmados en el país, estado y municipio.
+
+```{r, message = FALSE}
+resumen.covid <- df.covid %>%
+  mutate(Fecha = fecha_ingreso) %>%
+  select(Fecha, conf.sonora, conf.hmo) %>%
+  group_by(Fecha) %>%
+  summarise(confirmados.Nacional = n(), 
+            confirmados.Sonora = sum(conf.sonora),
+            confirmados.Hermosillo = sum(conf.hmo))
+```
+
+Se combinan los *data frame* de twitter y de COVID-19.
+
+```{r, message = FALSE}
+df <- resumen.covid %>%
+  left_join(df.tweet.date, by = "Fecha") %>%
+  filter(Fecha >= min(df.tweet$Fecha))
+write.csv(df, "tidyTablas/df.csv")
+```
+
+# COVID-19 + twitter
+
+### Resultados: Andrés Manuel
+
+```{r, message = FALSE}
+lm.AMLO <- lm(data = df, lopezobrador_ ~ confirmados.Nacional)
+summary(lm.AMLO)
+```
+
+```{r, message = FALSE}
+fig <- plot_ly(data = df, x = ~confirmados.Nacional, y = ~lopezobrador_,
+               marker = list(size = 10,
+                             color = 'lightskyblue',
+                             line = list(color = 'blue',
+                                         width = 1)))
+fig <- fig %>% 
+  layout(title = 'Styled Scatter',
+         yaxis = list(zeroline = FALSE),
+         xaxis = list(zeroline = FALSE))
+fig
+```
+
+```{r, echo = FALSE}
+cor.test(df$confirmados.Nacional, df$lopezobrador_)
+```
+
+### Resultados: Claudia Pavlovich
+
+```{r, message = FALSE}
+lm.CPA <- lm(data = df, ClaudiaPavlovic ~ confirmados.Sonora)
+summary(lm.CPA)
+```
+
+```{r, message = FALSE}
+fig <- plot_ly(data = df, x = ~confirmados.Sonora, y = ~ClaudiaPavlovic,
+               marker = list(size = 10,
+                             color = 'darkseagreen',
+                             line = list(color = 'green',
+                                         width = 1)))
+fig
+```
+
+```{r, message = FALSE, echo = FALSE}
+customWC("ClaudiaPavlovic", df.palabras)
+```
+
+### Resultados: Célida López
+
+```{r, message = FALSE}
+lm.CLC <- lm(data = df, CelidaLopezc ~ confirmados.Hermosillo)
+summary(lm.CLC)
+```
+
+```{r, message = FALSE}
+fig <- plot_ly(data = df, x = ~confirmados.Hermosillo, y = ~CelidaLopezc,
+               marker = list(size = 10,
+                             color = 'indianred',
+                             line = list(color = 'darkred',
+                                         width = 1)))
+fig
+```
+
+```{r, echo = FALSE}
+cor.test(df$confirmados.Hermosillo, df$CelidaLopezc)
+```
+
+# Referencias
+
+Datos de COVID19 descargados en:
+
+https://www.gob.mx/salud/documentos/datos-abiertos-152127
+
+
+Para imputar datos:
+
+https://towardsdatascience.com/how-to-handle-missing-data-8646b18db0d4
+
+
+
+
+
+https://rpubs.com/Joaquin_AR/334526
+
+https://rpubs.com/jboscomendoza/analisis_sentimientos_lexico_afinn

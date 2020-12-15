@@ -1,0 +1,244 @@
+---
+title: "Relación entre intensidad de sentimientos en twitter y número de casos confirmados"
+output: 
+  flexdashboard::flex_dashboard:
+    storyboard: true
+    theme: yeti
+---
+
+```{r setup, include=FALSE}
+#rm(list=ls())
+knitr::opts_chunk$set(echo = TRUE)
+```
+    
+```{r, message = FALSE, echo= FALSE}
+library(twitteR)
+library(tidyverse)
+library(tidytext)
+library(lubridate)
+library(magrittr)
+library(xts)
+library(dygraphs)
+library(reshape2)
+library(TTR)
+library(imputeTS)
+library(readxl)
+library(janitor)
+library(SnowballC)
+library(tm)
+library(syuzhet)
+library(kableExtra)
+library(plotly)
+library(flexdashboard)
+library(wordcloud)
+library(RColorBrewer)
+```
+
+```{r, message = FALSE, echo= FALSE}
+source("funciones/customWC.R")
+
+df.palabras <- read.csv("tidyTablas/df.palabras.csv")
+
+df.tweet.date <- read.csv("tidyTablas/df.tweet.date.csv")
+df.tweet.date$Fecha %<>% ymd()
+
+df <- read.csv("tidyTablas/df.csv")
+```
+
+### twitter + COVID19
+
+#### Un análisis (100% apartidista)
+
+![CLC,AMLO y CPA](images/3niveles.png =250x)
+
+***
+
+El objetivo de este _storyboard_ es explorar si el número de casos confirmados de COVID19 tiene impacto en la intensidad de sentimientos de estados publicados en twitter para 3 niveles de gobierno:
+
+- Presidente de la República: Andres Manuel Lopez Obrador [@lopezobrador_](https://twitter.com/lopezobrador_)
+
+- Gobernadora del Estado de Sonora: Claudia Pavlovich Arellano [@ClaudiaPavlovic](https://twitter.com/ClaudiaPavlovic)
+
+- Alcaldesa de Hermosillo: Célida López Cárdenas [@CelidaLopezc](https://twitter.com/CelidaLopezc)
+
+Para este análisis de sentimientos se utilizó una traducción del léxico Afinn; éste, es un conjunto de palabras con puntuación entre -4 y -1 si son percibidas de forma negativa y entre 1 y 4 si se perciben positivamente; aunque tiene sus limitaciones, cumple con el propósito de éste proyecto.
+
+### Top 10: Palabras positivas
+
+```{r, message = FALSE, echo = FALSE}
+sentimiento <- "Positiva"
+
+df.palabras %>%
+  filter(Tipo ==  sentimiento) %>%
+  group_by(screenName) %>%
+  count(Palabra, sort = T) %>%
+  arrange(-n, screenName) %>%
+  top_n(n = 10, wt = n) %>%
+  ggplot() +
+  aes(Palabra, n, fill = screenName) +
+  geom_col()+ 
+  facet_wrap("screenName", scales = "free") +
+  scale_y_continuous(expand = c(0, 0)) +
+  coord_flip() +
+  #labs(title = sentimiento) +
+  theme_minimal() +
+  theme(panel.grid.minor = element_blank(),
+      strip.background = element_rect(fill = "gray", colour = NA),
+      legend.position = "none"
+      )
+```
+
+### Top 10: Palabras negativas
+
+```{r, message = FALSE, echo = FALSE}
+sentimiento <- "Negativa"
+
+df.palabras %>%
+  filter(Tipo ==  sentimiento) %>%
+  group_by(screenName) %>%
+  count(Palabra, sort = T) %>%
+  arrange(-n, screenName) %>%
+  top_n(n = 10, wt = n) %>%
+  ggplot() +
+  aes(Palabra, n, fill = screenName) +
+  geom_col()+ 
+  facet_wrap("screenName", scales = "free") +
+  scale_y_continuous(expand = c(0, 0)) +
+  coord_flip() +
+  #labs(title = sentimiento) +
+  theme_minimal() +
+  theme(panel.grid.minor = element_blank(),
+      strip.background = element_rect(fill = "gray", colour = NA),
+      legend.position = "none"
+      )
+```
+
+### Promedio de polaridad
+
+```{r, message = FALSE, echo = FALSE}
+nSMA <- 10
+
+df.interpolado <- df.tweet.date %>%
+  transmute(AMLO = na_interpolation(lopezobrador_),
+         CPA = na_interpolation(ClaudiaPavlovic),
+         CLC = na_interpolation(CelidaLopezc)) %>%
+  cbind(Fecha = df.tweet.date$Fecha)
+
+df.SMA <- df.interpolado %>%
+  transmute(AMLO.SMA = SMA(AMLO, n = nSMA),
+            CPA.SMA = SMA(CPA, n = nSMA),
+            CLC.SMA = SMA(CLC, n = nSMA)) %>%
+  cbind(Fecha = df.tweet.date$Fecha) 
+
+xts.SMA <- xts(df.SMA %>% 
+                 select(-Fecha),
+               order.by = df.SMA$Fecha)
+xts.SMA <-  xts.SMA[nSMA:length(xts.SMA[,1]),]
+
+dygraph(xts.SMA) %>%
+  dyOptions(fillGraph = TRUE, pointShape = "ex") %>%
+  dyRangeSelector()
+```
+
+***
+El promedio diario de cada usuario es:
+
+- Andrés Manuel López Obrador:
+
+```{r, echo = FALSE}
+round(mean(df.tweet.date$AMLO.SMA, na.rm = TRUE), 2)
+```
+
+- Claudia Pavlovich Arellano
+
+```{r, echo = FALSE}
+round(mean(df.tweet.date$CPA.SMA, na.rm = TRUE), 2)
+```
+
+- Célida López Cárdenas
+
+```{r, echo = FALSE}
+round(mean(df.tweet.date$CLC.SMA, na.rm = TRUE), 2)
+```
+
+En la gráfica se muestran datos interpolados linealmente y con suavizamiento por medias móviles.
+
+### Nacional {data-commentary-width=500}
+
+Casos confirmados por día _vs_ puntos promedio.
+
+```{r, message = FALSE, echo = FALSE}
+fig <- plot_ly(data = df, x = ~confirmados.Nacional, y = ~lopezobrador_,
+               marker = list(size = 10,
+                             color = 'lightskyblue',
+                             line = list(color = 'blue',
+                                         width = 1)))
+fig
+```
+
+***
+Las variables no están correlacionadas.
+
+```{r, echo = FALSE}
+cor.test(df$confirmados.Nacional, df$lopezobrador_)
+```
+
+### Wordcloud: AMLO
+
+```{r, message = FALSE, echo = FALSE}
+customWC("lopezobrador_", df.palabras)
+```
+
+### Estatal {data-commentary-width=500}
+
+Casos confirmados por día _vs_ puntos promedio.
+
+```{r, message = FALSE, echo = FALSE}
+fig <- plot_ly(data = df, x = ~confirmados.Sonora, y = ~ClaudiaPavlovic,
+               marker = list(size = 10,
+                             color = 'darkseagreen',
+                             line = list(color = 'green',
+                                         width = 1)))
+fig
+```
+
+***
+Las variables no están correlacionadas.
+
+```{r, echo = FALSE}
+cor.test(df$confirmados.Sonora, df$ClaudiaPavlovic)
+```
+
+### Wordcloud: CPA
+
+```{r, message = FALSE, echo = FALSE}
+customWC("ClaudiaPavlovic", df.palabras)
+```
+
+### Municipal {data-commentary-width=500}
+
+Casos confirmados por día _vs_ puntos promedio.
+
+```{r, message = FALSE, echo = FALSE}
+fig <- plot_ly(data = df, x = ~confirmados.Hermosillo, y = ~CelidaLopezc,
+               marker = list(size = 10,
+                             color = 'indianred',
+                             line = list(color = 'darkred',
+                                         width = 1)))
+fig
+
+```
+
+***
+Las variables no están correlacionadas; sin embargo, el p-valor es suficientemente bajo y el resultado de la prueba de hipótesis puede cambiar si se actualizan los datos.
+
+```{r, echo = FALSE}
+cor.test(df$confirmados.Hermosillo, df$CelidaLopezc)
+```
+
+### Wordcloud: CLC
+
+```{r, message = FALSE, echo = FALSE}
+customWC("CelidaLopezc", df.palabras)
+```
+
