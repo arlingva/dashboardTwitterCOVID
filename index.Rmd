@@ -49,7 +49,7 @@ df <- read.csv("tidyTablas/df.csv")
 
 #### Un análisis (100% apartidista)
 
-![CLC,AMLO y CPA](images/3niveles.png =250x)
+![CLC,AMLO y CPA](imagenes/3niveles.png)
 
 ***
 
@@ -140,26 +140,25 @@ dygraph(xts.SMA) %>%
   dyRangeSelector()
 ```
 
-***
-El promedio diario de cada usuario es:
-
-- Andrés Manuel López Obrador:
-
-```{r, echo = FALSE}
-round(mean(df.tweet.date$AMLO.SMA, na.rm = TRUE), 2)
+```{r}
+df.palabras %>% 
+  group_by(screenName) %>% 
+  distinct(Palabra) %>% 
+  count() %>% 
+  kbl() %>% 
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive")) 
 ```
 
-- Claudia Pavlovich Arellano
+```{r}
+df.palabras %>% 
+  group_by(screenName, Fecha) %>% 
+  summarise(media = mean(Puntuacion, na.rm = TRUE)) %>%
+  group_by(screenName) %>%
+  summarise(media = mean(media, na.rm = TRUE))
 
-```{r, echo = FALSE}
-round(mean(df.tweet.date$CPA.SMA, na.rm = TRUE), 2)
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive")) 
 ```
 
-- Célida López Cárdenas
-
-```{r, echo = FALSE}
-round(mean(df.tweet.date$CLC.SMA, na.rm = TRUE), 2)
-```
 
 En la gráfica se muestran datos interpolados linealmente y con suavizamiento por medias móviles.
 

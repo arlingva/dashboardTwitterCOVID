@@ -82,7 +82,7 @@ afinn <- rbind(afinn, palabras.covid)
 
 Las claves: *consumer_key* (CK), *consumer_secret* (CS), *access_token* (AT) y *access_secret* (AS) se obtienen en https://apps.twitter.com/app.
 
-```{r, message = FALSE}
+```{r, message = FALSE, eval=FALSE}
 #https://apps.twitter.com/app/9399375/keys
 
 CK <- ""
@@ -316,29 +316,10 @@ df.covid0 <- unzip("data/datos_abiertos_covid.zip", exdir = "data") %>%
 ```
 
 2. Leer desde carpeta data
-201214COVID19MEXICO
+
 ```{r, message = FALSE}
 df.covid0 <- read.csv("data/201214COVID19MEXICO.csv") %>%
   clean_names()
-```
-
-```{r}
-df.covid0 <- df.covid0 %>%
-  filter(clasificacion_final==3)
-df.covid0 %>% write.csv("data/201214COVID19MEXICO.csv")
-```
-
-
-Se descarga catálogo de conceptos.
-
-```{r, message = FALSE}
-cve_mpo <-read_excel("data/201128 Catalogos.xlsx", sheet = "Catálogo MUNICIPIOS") %>% 
-  clean_names() %>% 
-  mutate(cve_mpo = str_c(as.integer(clave_entidad),
-                         "-",
-                         as.integer(clave_municipio)
-                         )
-         )
 ```
 
 Se seleccionan las variables de interés de los casos confirmados.

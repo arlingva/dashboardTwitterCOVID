@@ -1,5 +1,14 @@
 codigosCOVID <-function(df){
-  df <- df %>% 
+  cve_mpo <-read_excel("data/201128 Catalogos.xlsx", 
+                       sheet = "Catálogo MUNICIPIOS") %>% 
+    clean_names() %>% 
+    mutate(cve_mpo = str_c(as.integer(clave_entidad),
+                           "-",
+                           as.integer(clave_municipio)
+                           )
+    )
+
+    df <- df %>% 
   mutate(cve_mpo = str_c(entidad_res, "-", municipio_res))
          
          # Unir catálogo de municipios y genera variable "municipio" 
