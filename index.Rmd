@@ -1,5 +1,5 @@
 ---
-title: "Sentimientos en twitter y su relación con el número de casos confirmados de COVID-19"
+title: "Impacto de COVID-19 en la polaridad de sentimientos de twitter"
 output: 
   flexdashboard::flex_dashboard:
     storyboard: true
@@ -31,6 +31,7 @@ library(RColorBrewer)
 
 ```{r, message = FALSE, echo= FALSE}
 source("funciones/customWC.R")
+source("funciones/plotSentimientos.R")
 
 df.palabras <- read.csv("tidyTablas/df.palabras.csv")
 
@@ -65,51 +66,13 @@ Para el análisis de sentimientos se utilizó una traducción automática del l�
 ### Este es el top 10 de palabras positivas, los usarios están ordenados según su screen name en twitter
 
 ```{r, message = FALSE, echo = FALSE}
-sentimiento <- "Positiva"
-
-df.palabras %>%
-  filter(Tipo ==  sentimiento) %>%
-  group_by(screenName) %>%
-  count(Palabra, sort = T) %>%
-  arrange(-n, screenName) %>%
-  top_n(n = 10, wt = n) %>%
-  ggplot() +
-  aes(Palabra, n, fill = screenName) +
-  geom_col()+ 
-  facet_wrap("screenName", scales = "free") +
-  scale_y_continuous(expand = c(0, 0)) +
-  coord_flip() +
-  #labs(title = sentimiento) +
-  theme_minimal() +
-  theme(panel.grid.minor = element_blank(),
-      strip.background = element_rect(fill = "gray", colour = NA),
-      legend.position = "none"
-      )
+plotSentimientos("Positiva")
 ```
 
 ### La diferencia de vocabulario entre usuarios es evidente; se muestra el top 10 de palabras con carga negativa
 
 ```{r, message = FALSE, echo = FALSE}
-sentimiento <- "Negativa"
-
-df.palabras %>%
-  filter(Tipo ==  sentimiento) %>%
-  group_by(screenName) %>%
-  count(Palabra, sort = T) %>%
-  arrange(-n, screenName) %>%
-  top_n(n = 10, wt = n) %>%
-  ggplot() +
-  aes(Palabra, n, fill = screenName) +
-  geom_col()+ 
-  facet_wrap("screenName", scales = "free") +
-  scale_y_continuous(expand = c(0, 0)) +
-  coord_flip() +
-  #labs(title = sentimiento) +
-  theme_minimal() +
-  theme(panel.grid.minor = element_blank(),
-      strip.background = element_rect(fill = "gray", colour = NA),
-      legend.position = "none"
-      )
+plotSentimientos("Negativa")
 ```
 
 ### Análisis de sentimientos por fecha. En la gráfica se muestran datos interpolados linealmente y con suavizamiento por medias móviles.

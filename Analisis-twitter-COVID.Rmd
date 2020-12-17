@@ -39,6 +39,7 @@ source("funciones/GetData.R")
 source("funciones/codigosCOVID.R")
 source("funciones/CleanAndSelect.R")
 source("funciones/customWC.R")
+source("funciones/plotSentimientos.R")
 ```
 
 Se crean las carpetas data y tablas para guardar los datos crudos y tidy, repectivamente.
@@ -145,7 +146,7 @@ df.palabras$Palabra <- df.palabras$Palabra %>%
   str_replace_all("enfermedades", "enfermedad")
 ```
 
-Se crea un data frame donde se suman los puntos de cada palabra, de cada tweet.
+Se crea un data frame donde se asignan los puntos de cada palabra, de cada tweet.
 
 ```{r, message=FALSE}
 df.tweet <- df.palabras %>%
@@ -162,11 +163,10 @@ df.tweet <- df.palabras %>%
 Se cuenta la frecuencia de cada palabra y se descartan *sí* y *no*.
 
 ```{r, message = FALSE}
-# Palabras únicas
+# Cantidad de palabras y palabras únicas
 df.palabras %>% 
   group_by(screenName) %>% 
-  distinct(Palabra) %>% 
-  count() %>% 
+  summarise(n = n(), distintas = n_distinct(Palabra)) %>%
   kbl() %>% 
   kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive")) 
 
@@ -181,26 +181,7 @@ write.csv(df.palabras, "tidyTablas/df.palabras.csv")
 Se grafica el top 10 de palabras.
 
 ```{r, message = FALSE}
-map(c("Positiva", "Negativa"), function(sentimiento) {
-  df.palabras %>%
-    filter(Tipo ==  sentimiento) %>%
-    group_by(screenName) %>%
-    count(Palabra, sort = T) %>%
-    arrange(-n, screenName) %>%
-    top_n(n = 10, wt = n) %>%
-    ggplot() +
-    aes(Palabra, n, fill = screenName) +
-    geom_col()+ 
-    facet_wrap("screenName", scales = "free") +
-    scale_y_continuous(expand = c(0, 0)) +
-    coord_flip() +
-    labs(title = NULL) +
-    theme_minimal() +
-    theme(panel.grid.minor = element_blank(),
-        strip.background = element_rect(fill = "gray", colour = NA),
-        legend.position = "none"
-        )
-})
+map(c("Positiva", "Negativa"), plotSentimientos)
 ```
 
 ### Nube de palabras
@@ -377,7 +358,9 @@ summary(lm.AMLO)
 ```
 
 ```{r, message = FALSE}
-fig <- plot_ly(data = df, x = ~confirmados.Nacional, y = ~lopezobrador_,
+fig <- plot_ly(data = df, 
+               x = ~confirmados.Nacional, 
+               y = ~lopezobrador_,
                marker = list(size = 10,
                              color = 'lightskyblue',
                              line = list(color = 'blue',
@@ -397,7 +380,9 @@ summary(lm.CPA)
 ```
 
 ```{r, message = FALSE}
-fig <- plot_ly(data = df, x = ~confirmados.Sonora, y = ~ClaudiaPavlovic,
+fig <- plot_ly(data = df, 
+               x = ~confirmados.Sonora, 
+               y = ~ClaudiaPavlovic,
                marker = list(size = 10,
                              color = 'darkseagreen',
                              line = list(color = 'green',
@@ -417,7 +402,9 @@ summary(lm.CLC)
 ```
 
 ```{r, message = FALSE}
-fig <- plot_ly(data = df, x = ~confirmados.Hermosillo, y = ~CelidaLopezc,
+fig <- plot_ly(data = df, 
+               x = ~confirmados.Hermosillo, 
+               y = ~CelidaLopezc,
                marker = list(size = 10,
                              color = 'indianred',
                              line = list(color = 'darkred',
