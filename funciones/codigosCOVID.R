@@ -19,6 +19,7 @@ codigosCOVID <-function(df){
                   municipio = str_replace(municipio, " De ", " de "),
                   municipio = str_replace(municipio, " Del ", " del "),
                   municipio = str_replace(municipio, " Los ", " los "),
-                  municipio = str_replace(municipio, " La ", " la ")) 
+                  municipio = str_replace(municipio, " La ", " la "),
+                  municipio = str_replace(municipio, " Y ", " y ")) 
   return(df)
 }

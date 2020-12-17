@@ -85,10 +85,10 @@ Las claves: *consumer_key* (CK), *consumer_secret* (CS), *access_token* (AT) y *
 ```{r, message = FALSE, eval=FALSE}
 #https://apps.twitter.com/app/9399375/keys
 
-CK <- ""
-CS<- ""
-AT<- ""
-AS<- ""
+CK <- "consumer_key"
+CS<- "consumer_secret"
+AT<- "access_token"
+AS<- "access_secret"
 
 setup_twitter_oauth(CK, CS, AT, AS)
 ```
@@ -194,7 +194,7 @@ map(c("Positiva", "Negativa"), function(sentimiento) {
     facet_wrap("screenName", scales = "free") +
     scale_y_continuous(expand = c(0, 0)) +
     coord_flip() +
-    labs(title = sentimiento) +
+    labs(title = NULL) +
     theme_minimal() +
     theme(panel.grid.minor = element_blank(),
         strip.background = element_rect(fill = "gray", colour = NA),
@@ -239,19 +239,20 @@ xts.tweet.date <- xts(df.tweet.date %>%
                      order.by = df.tweet.date$Fecha)
 
 dygraph(xts.tweet.date) %>%
-  dyOptions(fillGraph=TRUE, pointShape = "ex") %>%
-  dyRangeSelector()
+  dyOptions(fillGraph=TRUE, pointShape = "ex")
 ```
 
 ### Interpolando datos
 
 ```{r, message = FALSE}
+# Interpolar datos
 df.interpolado <- df.tweet.date %>%
   transmute(AMLO = na_interpolation(lopezobrador_),
          CPA = na_interpolation(ClaudiaPavlovic),
          CLC = na_interpolation(CelidaLopezc)) %>%
   cbind(Fecha = df.tweet.date$Fecha)
 
+# Guardar como xts
 xts.interpolado <- xts(df.interpolado %>% 
                        select(-Fecha), 
                      order.by = df.interpolado$Fecha)
@@ -355,12 +356,14 @@ resumen.covid <- df.covid %>%
             confirmados.Hermosillo = sum(conf.hmo))
 ```
 
-Se combinan los *data frame* de twitter y de COVID-19.
+Se combinan los _data frame_ de twitter y de COVID-19.
 
 ```{r, message = FALSE}
 df <- resumen.covid %>%
   left_join(df.tweet.date, by = "Fecha") %>%
   filter(Fecha >= min(df.tweet$Fecha))
+
+# Guarda archivo
 write.csv(df, "tidyTablas/df.csv")
 ```
 
@@ -379,10 +382,6 @@ fig <- plot_ly(data = df, x = ~confirmados.Nacional, y = ~lopezobrador_,
                              color = 'lightskyblue',
                              line = list(color = 'blue',
                                          width = 1)))
-fig <- fig %>% 
-  layout(title = 'Styled Scatter',
-         yaxis = list(zeroline = FALSE),
-         xaxis = list(zeroline = FALSE))
 fig
 ```
 
@@ -406,8 +405,8 @@ fig <- plot_ly(data = df, x = ~confirmados.Sonora, y = ~ClaudiaPavlovic,
 fig
 ```
 
-```{r, message = FALSE, echo = FALSE}
-customWC("ClaudiaPavlovic", df.palabras)
+```{r, message = FALSE}
+cor.test(df$confirmados.Sonora, df$ClaudiaPavlovic)
 ```
 
 ### Resultados: Célida López
