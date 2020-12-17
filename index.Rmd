@@ -65,7 +65,7 @@ Para el análisis de sentimientos se utilizó una traducción automática del l�
 
 
 
-##### Los resultados no reflejan opinión personal de los usuarios ni de su partido político.
+##### Los resultados no reflejan opinión personal acerca de los usuarios ni de su partido político.
 
 ### Este es el top 10 de palabras positivas, los usarios están ordenados según su screen name en twitter
 
