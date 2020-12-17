@@ -51,17 +51,21 @@ knitr::include_graphics("imagenes/3niveles.png")
 
 #### ¿La polaridad de sentimientos en twitter se ha visto afectada por el número de casos confirmados de COVID-19?
 
-El objetivo de este _storyboard_ es responder esa pregunta para tres niveles de gobierno:
+El objetivo de este _storyboard_ es responder esa pregunta respecto a tres usuarios de twitter:
 
-- Presidente de la República: Andres Manuel Lopez Obrador [@lopezobrador_](https://twitter.com/lopezobrador_)
+- Andres Manuel Lopez Obrador (@lopezobrador_)
 
-- Gobernadora del Estado de Sonora: Claudia Pavlovich Arellano [@ClaudiaPavlovic](https://twitter.com/ClaudiaPavlovic)
+- Gobernadora del Estado de Sonora: 
+  Claudia Pavlovich Arellano (@ClaudiaPavlovic)
 
-- Alcaldesa de Hermosillo: Célida López Cárdenas [@CelidaLopezc](https://twitter.com/CelidaLopezc)
+- Alcaldesa de Hermosillo: 
+  Célida López Cárdenas (@CelidaLopezc)
 
-Para el análisis de sentimientos se utilizó una traducción automática del léxico Afinn; éste, es un conjunto de palabras con puntuación entre -4 y -1 si son percibidas de forma negativa y entre 1 y 4 si se perciben positivamente; si bien tiene sus limitaciones, cumple con el propósito de este proyecto.
+Para el análisis de sentimientos se utilizó una traducción automática del léxico Afinn.
 
-#### Un análisis exploratorio totalmente apartidista
+
+
+##### Los resultados no reflejan opinión personal de los usuarios ni de su partido político.
 
 ### Este es el top 10 de palabras positivas, los usarios están ordenados según su screen name en twitter
 
